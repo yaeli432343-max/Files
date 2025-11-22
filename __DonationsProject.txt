@@ -1,0 +1,273 @@
+--בסיס הנתונים מכיל טבלאות שונות לניהול מערך התורמים והתרומות של עמותה מסוימת
+
+create database Donations
+go
+
+use Donations
+go
+
+-- יצירת טבלת אזורים המפרטת את האזורים השונים בהם מתגוררים התורמים
+
+create table Regions
+(
+    RegionID       INT identity (1,1)   NOT NULL ,
+    RegionName     NVARCHAR(100)        NULL,
+    Manager        NVARCHAR(100)        NULL,
+
+    CONSTRAINT PK_Regions Primary key (RegionID)
+)
+
+GO
+
+-- יצירת טבלת תורמים המפרטת את פרטיהם האישיים של התורמים
+
+create table Donors
+(
+    DonorID         INT identity (1,1)   NOT NULL ,
+    FirstName       NVARCHAR(20)         NULL,
+    LastName        NVARCHAR(20)         NOT NULL,
+    NationalID      NVARCHAR(20)         NULL,
+    Address         NVARCHAR(200)        NULL,
+    City            NVARCHAR(100)        NULL,
+    RegionID        INT                  NOT NULL,     
+    Phone           NVARCHAR(50)         NULL,
+    Email           NVARCHAR(100)        NULL,
+
+    CONSTRAINT PK_Donors Primary key (Donorid),
+    CONSTRAINT FK_Donors Foreign key (regionID) REFERENCES regions(regionID)
+
+)
+
+GO
+
+-- יצירת טבלת תרומות המפרטת את פרטי התרומות המתקבלות בעמותה
+
+create table Donations
+(
+    DonationID       INT identity (1,1)   NOT NULL,
+    DonorID          INT                  NOT NULL,
+    Type             NVARCHAR(10)         NOT NULL,         
+    Date             DATE                 NOT NULL     default (getdate()),
+    Amount           MONEY                NOT NULL,
+
+    CONSTRAINT PK_Donations Primary key (DonationID),
+    CONSTRAINT FK_Donations foreign key (DonorID) REFERENCES Donors (DonorID),
+    CONSTRAINT CK_Donations_Amount_Positive CHECK (Amount >= 0)
+ )
+
+ GO
+
+ --יצירת טבלת פרטי אשראי המפרטת את פרטי האשראי עבור תרומות שהתקבלו באשראי
+
+ create table CreditDetails
+ (
+    CreditDetailID    INT IDENTITY(1,1)   NOT NULL,
+    DonationID        INT                 NOT NULL,
+    CardNumber        NVARCHAR(16)        NOT NULL,  
+    Expiry            NVARCHAR(4)         NOT NULL, 
+    CVV               NVARCHAR(3)         NOT NULL,
+    
+    CONSTRAINT PK_CreditDetails primary key (CreditDetailID),
+    CONSTRAINT FK_CreditDetails foreign key (DonationID) REFERENCES Donations (DonationID)
+)
+
+GO
+
+--יצירת טבלת פרטי שיקים המפרטת את פרטי השיקים עבור תרומות שהתקבלו בשיק
+
+create table CheckDetails
+ (
+    CheckDetailID     INT IDENTITY(1,1)   NOT NULL,
+    DonationID        INT                 NOT NULL,
+    CheckNumber       NVARCHAR(50)        NOT NULL,  
+    MaturityDate      DATE                NULL, 
+    
+    CONSTRAINT PK_CheckDetails primary key (CheckDetailID),
+    CONSTRAINT FK_CheckDetails foreign key (DonationID) REFERENCES Donations (DonationID)
+)
+
+GO
+
+--יצירת טבלת קבלות המרכזת את פרטי הקבלות שהופקו עבור התרומות
+
+create table Receipts
+(
+    ReceiptID         INT IDENTITY(1,1)   NOT NULL,
+    DonationID        INT                 NOT NULL,
+    NameOnReceipt     NVARCHAR(30)        NULL,     
+    [Date]            DATE                NULL          default (getdate()),
+    DeliveryMethod    NVARCHAR(50)        NULL          default ('email'),
+
+    CONSTRAINT PK_Receipts primary key (ReceiptID),
+    CONSTRAINT FK_Receipts foreign key (DonationID) REFERENCES Donations (DonationID)
+
+)
+
+GO
+
+-- הכנסת נתונים לטבלת האזורים. העמודה של מזהה אזור מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.Regions (RegionName, Manager) VALUES
+(N'Jerusalem District', N'Moshe Levi'),
+(N'Tel Aviv District',  N'Dan Cohen'),
+(N'Central District',   N'Yossi Mizrahi'),
+(N'Southern District',  N'Ilan Peretz'),
+(N'Northern District',  N'Amir Shalom')
+
+GO
+
+-- הכנסת נתונים לטבלת התורמים. העמודה של מזהה תורם מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.Donors (FirstName, LastName, NationalID, Address, City, RegionID, Phone, Email) VALUES
+(N'Aryeh',   N'Feldheim', N'100000001', N'1 Herzl St',         N'Jerusalem',     1, N'050-111-0001', N'aryeh1@example.com'),
+(N'David',   N'Levi',     N'100000002', N'2 Jabotinsky St',    N'Tel Aviv',      2, N'050-111-0002', N'david2@example.com'),
+(N'Moshe',   N'Cohen',    N'100000003', N'3 Weizmann St',      N'Petah Tikva',   3, N'050-111-0003', N'moshe3@example.com'),
+(N'Shmuel',  N'Biton',    N'100000004', N'4 Begin Blvd',       N'Beersheba',     4, N'050-111-0004', N'shmuel4@example.com'),
+(N'Yitzhak', N'Mizrahi',  N'100000005', N'5 Ben-Gurion St',    N'Haifa',         5, N'050-111-0005', N'yitzhak5@example.com'),
+(N'Yaakov',  N'Peretz',   N'100000006', N'6 Herzl St',         N'Jerusalem',     1, N'050-111-0006', N'yaakov6@example.com'),
+(N'Yehuda',  N'Azulay',   N'100000007', N'7 Jabotinsky St',    N'Bnei Brak',     2, N'050-111-0007', N'yehuda7@example.com'),
+(N'Avraham', N'Dahan',    N'100000008', N'8 Weizmann St',      N'Rishon LeZion', 3, N'050-111-0008', N'avraham8@example.com'),
+(N'Chaim',   N'Moyal',    N'100000009', N'9 Begin Blvd',       N'Ashdod',        4, N'050-111-0009', N'chaim9@example.com'),
+(N'Eliezer', N'Amar',     N'100000010', N'10 Ben-Gurion St',   N'Tiberias',      5, N'050-111-0010', N'eliezer10@example.com'),
+(N'Baruch',  N'Shalom',   N'100000011', N'11 Herzl St',        N'Jerusalem',     1, N'050-111-0011', N'baruch11@example.com'),
+(N'Meir',    N'BenDavid', N'100000012', N'12 Jabotinsky St',   N'Holon',         2, N'050-111-0012', N'meir12@example.com'),
+(N'Natan',   N'Avital',   N'100000013', N'13 Weizmann St',     N'Netanya',       3, N'050-111-0013', N'natan13@example.com'),
+(N'Tzvi',    N'Hadad',    N'100000014', N'14 Begin Blvd',      N'Ashkelon',      4, N'050-111-0014', N'tzvi14@example.com'),
+(N'Noam',    N'Oren',     N'100000015', N'15 Ben-Gurion St',   N'Nahariya',      5, N'050-111-0015', N'noam15@example.com'),
+(N'Asher',   N'Rahamim',  N'100000016', N'16 Herzl St',        N'Beit Shemesh',  1, N'050-111-0016', N'asher16@example.com'),
+(N'Daniel',  N'Gabbay',   N'100000017', N'17 Jabotinsky St',   N'Tel Aviv',      2, N'050-111-0017', N'daniel17@example.com'),
+(N'Eliyahu', N'Sasson',   N'100000018', N'18 Weizmann St',     N'Lod',           3, N'050-111-0018', N'eliyahu18@example.com'),
+(N'Yonatan', N'Dayan',    N'100000019', N'19 Begin Blvd',      N'Rehovot',       4, N'050-111-0019', N'yonatan19@example.com'),
+(N'Shimon',  N'Malka',    N'100000020', N'20 Ben-Gurion St',   N'Afula',         5, N'050-111-0020', N'shimon20@example.com')
+
+GO
+
+-- הכנסת נתונים לטבלת התרומות. העמודה של מזהה תרומה מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.Donations (DonorID, [Type], [Date], Amount) VALUES
+(1,  N'Credit',   '2025-01-01', 100),
+(2,  N'Check',    '2025-01-02', 150),
+(3,  N'Cash',     '2025-01-03', 200),
+(4,  N'Transfer', '2025-01-04', 250),
+(5,  N'Credit',   '2025-01-05', 180),
+(6,  N'Check',    '2025-01-06', 220),
+(7,  N'Cash',     '2025-01-07', 140),
+(8,  N'Transfer', '2025-01-08', 300),
+(9,  N'Credit',   '2025-01-09', 125),
+(10, N'Check',    '2025-01-10', 175),
+(11, N'Cash',     '2025-01-11', 210),
+(12, N'Transfer', '2025-01-12', 260),
+(13, N'Credit',   '2025-01-13', 190),
+(14, N'Check',    '2025-01-14', 230),
+(15, N'Cash',     '2025-01-15', 160),
+(16, N'Transfer', '2025-01-16', 310),
+(17, N'Credit',   '2025-01-17', 135),
+(18, N'Check',    '2025-01-18', 185),
+(19, N'Cash',     '2025-01-19', 205),
+(20, N'Transfer', '2025-01-20', 255),
+(1,  N'Credit',   '2025-01-21', 170),
+(2,  N'Check',    '2025-01-22', 215),
+(3,  N'Cash',     '2025-01-23', 145),
+(4,  N'Transfer', '2025-01-24', 295),
+(5,  N'Credit',   '2025-01-25', 120),
+(6,  N'Check',    '2025-01-26', 170),
+(7,  N'Cash',     '2025-01-27', 220),
+(8,  N'Transfer', '2025-01-28', 260),
+(9,  N'Credit',   '2025-01-29', 200),
+(10, N'Check',    '2025-01-30', 240),
+(11, N'Cash',     '2025-01-31', 180),
+(12, N'Transfer', '2025-02-01', 320),
+(13, N'Credit',   '2025-02-02', 140),
+(14, N'Check',    '2025-02-03', 190),
+(15, N'Cash',     '2025-02-04', 210),
+(16, N'Transfer', '2025-02-05', 250),
+(17, N'Credit',   '2025-02-06', 175),
+(18, N'Check',    '2025-02-07', 225),
+(19, N'Cash',     '2025-02-08', 155),
+(20, N'Transfer', '2025-02-09', 305),
+(1,  N'Credit',   '2025-02-10', 130),
+(2,  N'Check',    '2025-02-11', 180),
+(3,  N'Cash',     '2025-02-12', 230),
+(4,  N'Transfer', '2025-02-13', 270),
+(5,  N'Credit',   '2025-02-14', 210),
+(6,  N'Check',    '2025-02-15', 250),
+(7,  N'Cash',     '2025-02-16', 190),
+(8,  N'Transfer', '2025-02-17', 330),
+(9,  N'Credit',   '2025-02-18', 160),
+(10, N'Check',    '2025-02-19', 210)
+
+GO
+
+-- הכנסת נתונים לטבלת פרטי אשראי. העמודה של מזהה כרטיס מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.CreditDetails (DonationID, CardNumber, Expiry, CVV) VALUES
+(1,  N'4111111111110001', N'0127', N'123'),
+(5,  N'4111111111110005', N'0227', N'124'),
+(9,  N'4111111111110009', N'0327', N'125'),
+(13, N'4111111111110013', N'0427', N'126'),
+(17, N'4111111111110017', N'0527', N'127'),
+(21, N'4111111111110021', N'0627', N'128'),
+(25, N'4111111111110025', N'0727', N'129'),
+(29, N'4111111111110029', N'0827', N'130'),
+(33, N'4111111111110033', N'0927', N'131'),
+(37, N'4111111111110037', N'1027', N'132'),
+(41, N'4111111111110041', N'1127', N'133'),
+(45, N'4111111111110045', N'1227', N'134')
+
+GO
+
+-- הכנסת נתונים לטבלת פרטי שיקים. העמודה של מזהה שיק מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.CheckDetails (DonationID, CheckNumber, MaturityDate) VALUES
+(2,  N'7000000000000002', '2025-12-01'),
+(6,  N'7000000000000006', '2025-12-08'),
+(10, N'7000000000000010', '2025-12-15'),
+(14, N'7000000000000014', '2025-12-22'),
+(18, N'7000000000000018', '2025-12-29'),
+(22, N'7000000000000022', '2026-01-05'),
+(26, N'7000000000000026', '2026-01-12'),
+(30, N'7000000000000030', '2026-01-19'),
+(34, N'7000000000000034', '2026-01-26'),
+(38, N'7000000000000038', '2026-02-02'),
+(42, N'7000000000000042', '2026-02-09'),
+(46, N'7000000000000046', '2026-02-16')
+
+GO
+
+-- הכנסת נתונים לטבלת קבלות. העמודה של מזהה קבלה מקבלת מספור אוטומטי על פי ההגדרה לעיל
+INSERT INTO dbo.Receipts (DonationID, NameOnReceipt, DeliveryMethod) VALUES
+(1,  N'Official Receipt 1',  N'email'),
+(2,  N'Official Receipt 2',  N'sms'),
+(3,  N'Official Receipt 3',  N'mail'),
+(4,  N'Official Receipt 4',  N'courier'),
+(5,  N'Official Receipt 5',  N'email'),
+(6,  N'Official Receipt 6',  N'sms'),
+(7,  N'Official Receipt 7',  N'mail'),
+(8,  N'Official Receipt 8',  N'courier'),
+(9,  N'Official Receipt 9',  N'email'),
+(10, N'Official Receipt 10', N'sms'),
+(11, N'Official Receipt 11', N'mail'),
+(12, N'Official Receipt 12', N'courier'),
+(13, N'Official Receipt 13', N'email'),
+(14, N'Official Receipt 14', N'sms'),
+(15, N'Official Receipt 15', N'mail'),
+(16, N'Official Receipt 16', N'courier'),
+(17, N'Official Receipt 17', N'email'),
+(18, N'Official Receipt 18', N'sms'),
+(19, N'Official Receipt 19', N'mail'),
+(20, N'Official Receipt 20', N'courier'),
+(21, N'Official Receipt 21', N'email'),
+(22, N'Official Receipt 22', N'sms'),
+(23, N'Official Receipt 23', N'mail'),
+(24, N'Official Receipt 24', N'courier'),
+(25, N'Official Receipt 25', N'email'),
+(26, N'Official Receipt 26', N'sms'),
+(27, N'Official Receipt 27', N'mail'),
+(28, N'Official Receipt 28', N'courier'),
+(29, N'Official Receipt 29', N'email'),
+(30, N'Official Receipt 30', N'sms'),
+(31, N'Official Receipt 31', N'mail'),
+(32, N'Official Receipt 32', N'courier'),
+(33, N'Official Receipt 33', N'email'),
+(34, N'Official Receipt 34', N'sms'),
+(35, N'Official Receipt 35', N'mail'),
+(36, N'Official Receipt 36', N'courier'),
+(37, N'Official Receipt 37', N'email'),
+(38, N'Official Receipt 38', N'sms'),
+(39, N'Official Receipt 39', N'mail'),
+(40, N'Official Receipt 40', N'courier')

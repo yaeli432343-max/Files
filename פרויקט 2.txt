@@ -1,0 +1,206 @@
+-- 1
+ 
+select *,
+  cast(round(100*((YearlyLinearIncome/ lag (YearlyLinearIncome) over (order by Year))-1),2) as decimal(10,2)) as GrowthRate
+from (
+  select
+    year(o.OrderDate) as Year,
+    sum(ol.Quantity * ol.UnitPrice) as IncomePerYear,
+    count(distinct month(o.OrderDate)) as NumberOfDistinctMonth,
+    cast(round(sum(ol.Quantity * ol.UnitPrice) / count(distinct month(o.OrderDate)) * 12, 2) as decimal(10,2)) as YearlyLinearIncome
+  from sales.Orders o
+  join sales.OrderLines ol on o.OrderID = ol.OrderID
+  where o.PickingCompletedWhen is not null
+  group by year(o.OrderDate)
+) data
+order by Year
+ 
+--2
+ 
+with data2 as
+(select
+                year (o.orderdate) as TheYear,
+                case
+                when month (o.orderdate) between 1 and 3 then 1
+                when month (o.orderdate) between 4 and 6 then 2
+                when month (o.orderdate) between 7 and 9 then 3
+                else 4
+                end as TheQuarter,
+                c.CustomerName,
+                o.OrderID
+from sales.Orders o join Sales.Customers c
+on o.CustomerID = c.CustomerID
+where o.PickingCompletedWhen is not null
+),
+ranked_data as(
+select d.TheYear,
+                   d.TheQuarter,
+                   d.CustomerName,
+sum(ol.Quantity * ol.UnitPrice) as IncomePerYear,
+rank () over (partition by TheYear, TheQuarter order by sum(ol.Quantity * ol.UnitPrice) desc) DNR
+from data2 d join Sales.OrderLines ol
+on d.OrderID = ol.OrderID
+group by TheYear, TheQuarter, CustomerName)
+select *
+from ranked_data
+where DNR < 6
+order by TheYear, TheQuarter, IncomePerYear desc
+ 
+--3
+ 
+select top 10
+                                StockItemID,
+                                Description as StockItemName,
+                                sum(ExtendedPrice-TaxAmount) as TotalProfit
+from Sales.InvoiceLines
+group by StockItemID, Description
+order by TotalProfit desc
+ 
+--4
+ 
+with Profit as
+(                              select StockItemID, StockItemName, UnitPrice, RecommendedRetailPrice,
+                    (RecommendedRetailPrice-UnitPrice) as NominalProductProfit
+                                from Warehouse.StockItems
+)
+select  row_number() over (order by NominalProductProfit desc) as Rn,
+                                *,
+                                dense_rank () over (order by NominalProductProfit desc) as DNR
+from Profit
+ 
+--5
+ 
+select
+                concat (s.SupplierID,' - ',SupplierName) as SupplierDetails,
+                string_agg (cast(w.StockItemID as varchar) + ' - ' + StockItemName,
+        ' , / ') as ProductDetails
+from Purchasing.Suppliers s right join Warehouse.StockItems w
+on s.SupplierID = w.SupplierID
+group by concat (s.SupplierID,' - ',SupplierName)
+ 
+ 
+--6
+ 
+select top 5
+c.CustomerID , ci.CityName , co.CountryName, co.Continent, co. Region, sum(ExtendedPrice) as TotalExtendedPrice
+from Sales.Customers c
+join Application.Cities ci
+on c.DeliveryCityID = ci.CityID
+join Application.StateProvinces s
+on ci.StateProvinceID = s.StateProvinceID
+join Application.Countries co
+on s.CountryID = co.CountryID
+join Sales.Invoices i
+on i.CustomerID = c.CustomerID
+join sales.InvoiceLines il
+on il.InvoiceID = i.InvoiceID
+group by c.CustomerID , ci.CityName , co.CountryName, co.Continent, co. Region
+order by sum(ExtendedPrice) desc
+ 
+ 
+--7
+ 
+WITH MonthlyData AS (
+    SELECT
+        YEAR(OrderDate) AS OrderYear,
+        MONTH(OrderDate) AS OrderMonth,
+        SUM(ol.Quantity * ol.UnitPrice) AS MonthlyTotal
+    FROM sales.Orders o
+    JOIN sales.OrderLines ol ON o.OrderID = ol.OrderID
+    WHERE o.PickingCompletedWhen IS NOT NULL
+    GROUP BY YEAR(OrderDate), MONTH(OrderDate)
+),
+MonthlyWithCumulative AS (
+    SELECT
+        OrderYear,
+        CAST(OrderMonth AS VARCHAR) AS OrderMonth,
+        MonthlyTotal,
+        SUM(MonthlyTotal) OVER (PARTITION BY OrderYear ORDER BY OrderMonth) AS CumulativeTotal,
+        OrderMonth AS SortMonth
+    FROM MonthlyData
+),
+YearlySummary AS (
+    SELECT
+        OrderYear,
+        'GrandTotal' AS OrderMonth,
+        SUM(MonthlyTotal) AS MonthlyTotal,
+        SUM(MonthlyTotal) AS CumulativeTotal,
+        13 AS SortMonth
+    FROM MonthlyData
+    GROUP BY OrderYear
+)
+ 
+SELECT OrderYear, OrderMonth, MonthlyTotal, CumulativeTotal
+FROM (
+    SELECT * FROM MonthlyWithCumulative
+    UNION ALL
+    SELECT * FROM YearlySummary
+) AS FinalData
+ORDER BY OrderYear, SortMonth
+ 
+--8
+ 
+select OrderMonth, [2013],[2014],[2015],[2016]
+from (
+select year(OrderDate) as OrderYear, month(OrderDate) as OrderMonth, OrderID
+from sales.Orders
+) A
+pivot (count (OrderID) for OrderYear in ([2013],[2014],[2015],[2016]))P
+order by OrderMonth
+ 
+--9
+ 
+with ordersdata as
+(
+select c.CustomerID, c.CustomerName, o.OrderDate,
+lag (o.OrderDate) over (partition by c.customerid order by o.OrderDate) as PreviousOrderDate,
+datediff (DAY, MAX (o.OrderDate) over (partition by c.customerID), '2016-05-31') as DaysSinceLastOrder
+from sales.Customers c join sales.Orders o
+on c.CustomerID = o.CustomerID
+),
+ordersdata2 as
+(
+select *,
+avg (DATEDIFF(day,previousorderdate, OrderDate))over (partition by customerID) as AvgDaysBetweenOrders
+from ordersdata
+)
+select *,
+case
+                when DaysSinceLastOrder > AvgDaysBetweenOrders*2
+                then 'Potential churn'
+                else 'Active'
+end as CustomerStatus
+from ordersdata2
+ 
+--10
+ 
+with fixnames as
+(
+select
+CustomerCategoryID,
+case
+                when CustomerName like '%tailspin%' then 'Tailspin'
+                when CustomerName like '%Wingtip%' then 'Wingtip'
+                else CustomerName
+end as fixname
+from
+Sales.Customers
+),
+level2 as
+(
+select c.CustomerCategoryName,
+count (distinct d.fixname) as customerCOUNT
+from sales.CustomerCategories c join fixnames d
+on c.CustomerCategoryID = d.CustomerCategoryID
+group by c.CustomerCategoryName
+),
+level3 as
+(
+select *,
+sum (customerCOUNT) over () as TotalCustCount
+from level2
+)
+select *,
+FORMAT(CAST(CustomerCOUNT as float)/CAST(TotalCustCount as float), 'P') as DistributionFactor
+from level3
+ 
